@@ -1,0 +1,18 @@
+services:
+  delphi-bot:
+    build: .
+    image: delphi-bot:latest
+    container_name: delphi-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Base SQLite persistante sur le NAS
+      - ./data:/data
+    # Aucun port exposé : le bot fait uniquement des connexions sortantes
+    # vers Discord. Le NAS reste invisible depuis Internet.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
