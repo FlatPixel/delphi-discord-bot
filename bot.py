@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Bot Discord pour la méthode Delphi.
-Collecte itérative et anonyme d'avis d'experts via DM, avec synthèse
-statistique entre les tours.
+Discord bot implementing the Delphi method.
+
+Iterative, anonymous collection of expert opinions via DM, with statistical
+synthesis between rounds.
 """
 
 import os
@@ -29,11 +30,11 @@ TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DB_PATH = os.getenv("DELPHI_DB_PATH", "delphi.db")
 
 intents = discord.Intents.default()
-intents.members = True  # Privilégié : à activer dans le Developer Portal
+intents.members = True  # Privileged — must be enabled in the Developer Portal
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 
-# ============== BASE DE DONNÉES ==============
+# ============== DATABASE ==============
 
 def db():
     conn = sqlite3.connect(DB_PATH)
@@ -74,7 +75,7 @@ def init_db():
         """)
 
 
-# ============== LOGIQUE DELPHI ==============
+# ============== DELPHI LOGIC ==============
 
 def create_session(guild_id, channel_id, facilitator_id, question,
                    qtype, options, panelists, rounds):
@@ -145,7 +146,7 @@ def all_responses_in(session_id, round_num):
 
 
 def synthesize_round(session_id, round_num):
-    """Génère une synthèse statistique anonymisée du tour."""
+    """Generate an anonymized statistical summary of the round."""
     session = get_session(session_id)
     with db() as conn:
         responses = conn.execute(
@@ -158,43 +159,43 @@ def synthesize_round(session_id, round_num):
     values = [r["value"] for r in responses]
     justifs = [r["justification"] for r in responses if r["justification"]]
 
-    out = f"**Synthèse du tour {round_num}** — {len(responses)} réponse(s)\n\n"
+    out = f"**Round {round_num} synthesis** — {len(responses)} response(s)\n\n"
 
     if qtype == "numeric":
         nums = [float(v) for v in values]
         out += (
-            f"📊 **Statistiques**\n"
-            f"• Médiane : `{statistics.median(nums):.2f}`\n"
-            f"• Moyenne : `{statistics.mean(nums):.2f}`\n"
-            f"• Min – Max : `{min(nums):.2f}` – `{max(nums):.2f}`\n"
+            f"📊 **Statistics**\n"
+            f"• Median: `{statistics.median(nums):.2f}`\n"
+            f"• Mean: `{statistics.mean(nums):.2f}`\n"
+            f"• Min – Max: `{min(nums):.2f}` – `{max(nums):.2f}`\n"
         )
         if len(nums) >= 4:
             q = statistics.quantiles(nums, n=4)
-            out += f"• Q1 – Q3 : `{q[0]:.2f}` – `{q[2]:.2f}` (IIQ)\n"
+            out += f"• Q1 – Q3: `{q[0]:.2f}` – `{q[2]:.2f}` (IQR)\n"
 
     elif qtype == "likert":
-        out += "📊 **Distribution** (1 = pas du tout d'accord, 5 = tout à fait)\n"
+        out += "📊 **Distribution** (1 = strongly disagree, 5 = strongly agree)\n"
         for i in range(1, 6):
             c = values.count(str(i))
             bar = "█" * c if c else "·"
             out += f"`{i}` {bar} ({c})\n"
         nums = [int(v) for v in values]
-        out += (f"\nMédiane : `{statistics.median(nums)}` | "
-                f"Moyenne : `{statistics.mean(nums):.2f}`\n")
+        out += (f"\nMedian: `{statistics.median(nums)}` | "
+                f"Mean: `{statistics.mean(nums):.2f}`\n")
 
     elif qtype == "choice":
         options = json.loads(session["options"])
-        out += "📊 **Répartition des votes**\n"
+        out += "📊 **Vote distribution**\n"
         ranked = sorted(
             ((opt, values.count(opt)) for opt in options),
             key=lambda x: -x[1],
         )
         for opt, c in ranked:
             bar = "█" * c if c else "·"
-            out += f"**{opt}** : {bar} ({c})\n"
+            out += f"**{opt}**: {bar} ({c})\n"
 
     if justifs:
-        out += "\n💬 **Arguments anonymisés**\n"
+        out += "\n💬 **Anonymized arguments**\n"
         for j in justifs:
             j_short = j[:300] + ("…" if len(j) > 300 else "")
             out += f"> {j_short}\n"
@@ -203,7 +204,7 @@ def synthesize_round(session_id, round_num):
 
 
 def advance_round(session_id):
-    """Passe au tour suivant, ou clôture la session si dernier tour atteint."""
+    """Move to the next round, or close the session if last round reached."""
     session = get_session(session_id)
     if session["current_round"] >= session["total_rounds"]:
         with db() as conn:
@@ -221,13 +222,13 @@ def advance_round(session_id):
     return new_round
 
 
-# ============== INTERFACE UTILISATEUR ==============
+# ============== USER INTERFACE ==============
 
 class ResponseModal(discord.ui.Modal):
-    """Formulaire de réponse à un tour."""
+    """Form for submitting a round response."""
 
     def __init__(self, session_id, round_num, qtype, options=None):
-        super().__init__(title=f"Réponse — Tour {round_num}")
+        super().__init__(title=f"Response — Round {round_num}")
         self.session_id = session_id
         self.round_num = round_num
         self.qtype = qtype
@@ -235,22 +236,22 @@ class ResponseModal(discord.ui.Modal):
 
         if qtype == "numeric":
             self.value_input = discord.ui.TextInput(
-                label="Votre estimation (nombre)",
-                placeholder="ex : 42.5",
+                label="Your estimate (number)",
+                placeholder="e.g. 42.5",
                 required=True,
                 max_length=20,
             )
         elif qtype == "likert":
             self.value_input = discord.ui.TextInput(
-                label="Niveau d'accord (1 à 5)",
-                placeholder="1 = pas du tout, 5 = tout à fait",
+                label="Agreement level (1 to 5)",
+                placeholder="1 = strongly disagree, 5 = strongly agree",
                 required=True,
                 max_length=1,
             )
         else:  # choice
             opts_preview = " / ".join(options or [])
             self.value_input = discord.ui.TextInput(
-                label="Votre choix",
+                label="Your choice",
                 placeholder=opts_preview[:100],
                 required=True,
                 max_length=100,
@@ -258,7 +259,7 @@ class ResponseModal(discord.ui.Modal):
         self.add_item(self.value_input)
 
         self.justif_input = discord.ui.TextInput(
-            label="Justification (optionnelle, recommandée)",
+            label="Justification (optional, recommended)",
             style=discord.TextStyle.paragraph,
             required=False,
             max_length=1000,
@@ -274,19 +275,19 @@ class ResponseModal(discord.ui.Modal):
                 float(v)
             except ValueError:
                 await interaction.response.send_message(
-                    "❌ Valeur invalide : entrez un nombre.", ephemeral=True
+                    "❌ Invalid value: please enter a number.", ephemeral=True
                 )
                 return
         elif self.qtype == "likert":
             if v not in {"1", "2", "3", "4", "5"}:
                 await interaction.response.send_message(
-                    "❌ Entrez un entier entre 1 et 5.", ephemeral=True
+                    "❌ Please enter an integer between 1 and 5.", ephemeral=True
                 )
                 return
         elif self.qtype == "choice":
             if v not in (self.options or []):
                 await interaction.response.send_message(
-                    f"❌ Options possibles : {', '.join(self.options or [])}",
+                    f"❌ Valid options: {', '.join(self.options or [])}",
                     ephemeral=True,
                 )
                 return
@@ -296,19 +297,19 @@ class ResponseModal(discord.ui.Modal):
             v, self.justif_input.value or None,
         )
         await interaction.response.send_message(
-            "✅ Réponse enregistrée, merci.", ephemeral=True
+            "✅ Response recorded, thanks.", ephemeral=True
         )
 
         if all_responses_in(self.session_id, self.round_num):
             logger.info(
-                f"Toutes les réponses reçues pour session {self.session_id} "
-                f"tour {self.round_num}, clôture automatique."
+                f"All responses received for session {self.session_id} "
+                f"round {self.round_num}, auto-closing."
             )
             await close_round(self.session_id, self.round_num)
 
 
 class RespondView(discord.ui.View):
-    """Vue avec un bouton 'Répondre' (non persistante)."""
+    """View with a 'Respond' button (non-persistent)."""
 
     def __init__(self, session_id, round_num, qtype, options=None):
         super().__init__(timeout=None)
@@ -318,7 +319,7 @@ class RespondView(discord.ui.View):
         self.options = options
 
     @discord.ui.button(
-        label="Répondre", style=discord.ButtonStyle.primary, emoji="📝"
+        label="Respond", style=discord.ButtonStyle.primary, emoji="📝"
     )
     async def respond(self, interaction, button):
         modal = ResponseModal(
@@ -329,23 +330,23 @@ class RespondView(discord.ui.View):
 
 async def send_round_to_panelist(user, session_id, round_num, question,
                                  qtype, options=None, synthesis=None):
-    """DM un panéliste avec la question et un bouton de réponse."""
+    """DM a panelist with the question and a response button."""
     embed = discord.Embed(
-        title=f"🗳️ Delphi — Tour {round_num} (session #{session_id})",
+        title=f"🗳️ Delphi — Round {round_num} (session #{session_id})",
         description=question,
         color=discord.Color.blue(),
     )
     if synthesis:
         embed.add_field(
-            name="Synthèse du tour précédent",
+            name="Previous round synthesis",
             value=synthesis[:1024],
             inline=False,
         )
         embed.add_field(
-            name="💡 Consigne",
-            value=("Au regard de la synthèse, vous pouvez réviser ou "
-                   "confirmer votre position. **Si vous êtes éloigné(e) "
-                   "de la médiane, justifiez en quelques mots.**"),
+            name="💡 Guidance",
+            value=("In light of the synthesis, you may revise or confirm "
+                   "your position. **If you are far from the median, please "
+                   "justify in a few words.**"),
             inline=False,
         )
     if qtype == "choice" and options:
@@ -355,7 +356,7 @@ async def send_round_to_panelist(user, session_id, round_num, question,
             inline=False,
         )
     embed.set_footer(
-        text=f"Astuce : si le bouton ne répond plus, utilisez "
+        text=f"Tip: if the button stops working, use "
              f"/delphi_respond session_id:{session_id}"
     )
 
@@ -364,26 +365,26 @@ async def send_round_to_panelist(user, session_id, round_num, question,
         await user.send(embed=embed, view=view)
         return True
     except discord.Forbidden:
-        logger.warning(f"DM impossible pour user {user.id}")
+        logger.warning(f"Cannot DM user {user.id}")
         return False
 
 
 async def close_round(session_id, round_num):
-    """Clôture le tour, poste la synthèse, lance le tour suivant ou termine."""
+    """Close the round: post synthesis, advance to next round or end the session."""
     session = get_session(session_id)
     if not session or session["status"] != "active":
         return
     if session["current_round"] != round_num:
-        return  # Déjà clôturé
+        return  # Already closed
 
     synthesis = synthesize_round(session_id, round_num)
     channel = bot.get_channel(session["channel_id"])
 
     if channel:
-        # Découpe en plusieurs messages si trop long
+        # Split into multiple messages if too long
         chunks = [synthesis[i:i + 1900] for i in range(0, len(synthesis), 1900)]
         await channel.send(
-            f"🔔 **Tour {round_num} clôturé** — session #{session_id}"
+            f"🔔 **Round {round_num} closed** — session #{session_id}"
         )
         for c in chunks:
             await channel.send(c)
@@ -392,8 +393,8 @@ async def close_round(session_id, round_num):
     if new_round is None:
         if channel:
             await channel.send(
-                f"🏁 **Session #{session_id} terminée.** "
-                f"La synthèse ci-dessus constitue le résultat final."
+                f"🏁 **Session #{session_id} completed.** "
+                f"The synthesis above is the final result."
             )
         return
 
@@ -406,26 +407,26 @@ async def close_round(session_id, round_num):
                 session["question_type"], options=options, synthesis=synthesis,
             )
         except Exception as e:
-            logger.exception(f"Erreur envoi tour {new_round} à user {uid}: {e}")
+            logger.exception(f"Error sending round {new_round} to user {uid}: {e}")
 
 
 # ============== SLASH COMMANDS ==============
 
 @bot.tree.command(
     name="delphi_create",
-    description="Lance une nouvelle session Delphi",
+    description="Start a new Delphi session",
 )
 @app_commands.describe(
-    question="La question soumise au panel",
-    panel="Mentions des participants (ex : @alice @bob @charlie)",
-    type="Type de réponse attendue",
-    rounds="Nombre de tours (2 à 5, défaut 3)",
-    options="Pour 'choice' uniquement : options séparées par | (ex : A|B|C)",
+    question="Question put to the panel",
+    panel="Participant mentions (e.g. @alice @bob @charlie)",
+    type="Type of expected response",
+    rounds="Number of rounds (2 to 5, default 3)",
+    options="For 'choice' only: options separated by | (e.g. A|B|C)",
 )
 @app_commands.choices(type=[
-    app_commands.Choice(name="Numérique (estimation chiffrée)", value="numeric"),
-    app_commands.Choice(name="Likert 1-5 (niveau d'accord)", value="likert"),
-    app_commands.Choice(name="Choix parmi options", value="choice"),
+    app_commands.Choice(name="Numeric (numerical estimate)", value="numeric"),
+    app_commands.Choice(name="Likert 1-5 (agreement level)", value="likert"),
+    app_commands.Choice(name="Choice among options", value="choice"),
 ])
 async def delphi_create(
     interaction: discord.Interaction,
@@ -438,12 +439,12 @@ async def delphi_create(
     user_ids = [int(m) for m in re.findall(r"<@!?(\d+)>", panel)]
     if not user_ids:
         await interaction.response.send_message(
-            "❌ Mentionnez au moins un participant (@nom).", ephemeral=True
+            "❌ Please mention at least one participant (@name).", ephemeral=True
         )
         return
     if not 2 <= rounds <= 5:
         await interaction.response.send_message(
-            "❌ Le nombre de tours doit être entre 2 et 5.", ephemeral=True
+            "❌ Number of rounds must be between 2 and 5.", ephemeral=True
         )
         return
 
@@ -451,14 +452,14 @@ async def delphi_create(
     if type.value == "choice":
         if not options:
             await interaction.response.send_message(
-                "❌ Pour 'choice', précisez les options (séparées par |).",
+                "❌ For 'choice' type, specify options (separated by |).",
                 ephemeral=True,
             )
             return
         parsed_options = [o.strip() for o in options.split("|") if o.strip()]
         if len(parsed_options) < 2:
             await interaction.response.send_message(
-                "❌ Au moins 2 options sont nécessaires.", ephemeral=True
+                "❌ At least 2 options required.", ephemeral=True
             )
             return
 
@@ -468,8 +469,8 @@ async def delphi_create(
     )
 
     await interaction.response.send_message(
-        f"✅ **Session Delphi #{session_id} créée.**\n"
-        f"📨 Envoi des invitations en DM aux {len(set(user_ids))} panélistes…",
+        f"✅ **Delphi session #{session_id} created.**\n"
+        f"📨 Sending DM invitations to {len(set(user_ids))} panelist(s)…",
         ephemeral=False,
     )
 
@@ -483,37 +484,37 @@ async def delphi_create(
             if not ok:
                 failed.append(f"<@{uid}>")
         except Exception as e:
-            logger.exception(f"Erreur DM user {uid}: {e}")
+            logger.exception(f"Error DMing user {uid}: {e}")
             failed.append(f"<@{uid}>")
 
     if failed:
         await interaction.followup.send(
-            f"⚠️ Impossible d'envoyer un DM à : {', '.join(failed)} "
-            f"(DMs fermés ou utilisateur introuvable).",
+            f"⚠️ Could not DM: {', '.join(failed)} "
+            f"(DMs closed or user not found).",
             ephemeral=True,
         )
 
 
 @bot.tree.command(
     name="delphi_respond",
-    description="Répondre au tour en cours d'une session (fallback du bouton DM)",
+    description="Respond to the current round of a session (DM button fallback)",
 )
-@app_commands.describe(session_id="ID de la session")
+@app_commands.describe(session_id="Session ID")
 async def delphi_respond(interaction: discord.Interaction, session_id: int):
     session = get_session(session_id)
     if not session:
         await interaction.response.send_message(
-            "❌ Session introuvable.", ephemeral=True
+            "❌ Session not found.", ephemeral=True
         )
         return
     if not is_panelist(session_id, interaction.user.id):
         await interaction.response.send_message(
-            "❌ Vous ne faites pas partie de ce panel.", ephemeral=True
+            "❌ You are not part of this panel.", ephemeral=True
         )
         return
     if session["status"] != "active":
         await interaction.response.send_message(
-            "❌ Cette session est terminée.", ephemeral=True
+            "❌ This session is no longer active.", ephemeral=True
         )
         return
     options = json.loads(session["options"]) if session["options"] else None
@@ -525,14 +526,14 @@ async def delphi_respond(interaction: discord.Interaction, session_id: int):
 
 @bot.tree.command(
     name="delphi_status",
-    description="Affiche l'état d'une session",
+    description="Show the state of a session",
 )
-@app_commands.describe(session_id="ID de la session")
+@app_commands.describe(session_id="Session ID")
 async def delphi_status(interaction: discord.Interaction, session_id: int):
     session = get_session(session_id)
     if not session:
         await interaction.response.send_message(
-            "❌ Session introuvable.", ephemeral=True
+            "❌ Session not found.", ephemeral=True
         )
         return
     panelists = get_panelists(session_id)
@@ -544,24 +545,24 @@ async def delphi_status(interaction: discord.Interaction, session_id: int):
         ).fetchone()[0]
 
     embed = discord.Embed(
-        title=f"📋 Session Delphi #{session_id}",
+        title=f"📋 Delphi session #{session_id}",
         description=session["question"],
         color=discord.Color.gold(),
     )
-    embed.add_field(name="Statut", value=session["status"], inline=True)
+    embed.add_field(name="Status", value=session["status"], inline=True)
     embed.add_field(
-        name="Tour",
+        name="Round",
         value=f"{session['current_round']}/{session['total_rounds']}",
         inline=True,
     )
     embed.add_field(
-        name="Réponses",
+        name="Responses",
         value=f"{responded}/{len(panelists)}",
         inline=True,
     )
     embed.add_field(name="Type", value=session["question_type"], inline=True)
     embed.add_field(
-        name="Facilitateur",
+        name="Facilitator",
         value=f"<@{session['facilitator_id']}>",
         inline=True,
     )
@@ -570,49 +571,49 @@ async def delphi_status(interaction: discord.Interaction, session_id: int):
 
 @bot.tree.command(
     name="delphi_close_round",
-    description="Force la clôture du tour en cours (facilitateur uniquement)",
+    description="Force-close the current round (facilitator only)",
 )
-@app_commands.describe(session_id="ID de la session")
+@app_commands.describe(session_id="Session ID")
 async def delphi_close_round(interaction: discord.Interaction, session_id: int):
     session = get_session(session_id)
     if not session:
         await interaction.response.send_message(
-            "❌ Session introuvable.", ephemeral=True
+            "❌ Session not found.", ephemeral=True
         )
         return
     if interaction.user.id != session["facilitator_id"]:
         await interaction.response.send_message(
-            "❌ Seul le facilitateur peut clôturer un tour manuellement.",
+            "❌ Only the facilitator can manually close a round.",
             ephemeral=True,
         )
         return
     if session["status"] != "active":
         await interaction.response.send_message(
-            "❌ Session déjà terminée.", ephemeral=True
+            "❌ Session is no longer active.", ephemeral=True
         )
         return
 
     await interaction.response.send_message(
-        f"⏩ Clôture du tour {session['current_round']}…", ephemeral=True
+        f"⏩ Closing round {session['current_round']}…", ephemeral=True
     )
     await close_round(session_id, session["current_round"])
 
 
 @bot.tree.command(
     name="delphi_abort",
-    description="Annule une session en cours (facilitateur uniquement)",
+    description="Abort an active session (facilitator only)",
 )
-@app_commands.describe(session_id="ID de la session")
+@app_commands.describe(session_id="Session ID")
 async def delphi_abort(interaction: discord.Interaction, session_id: int):
     session = get_session(session_id)
     if not session:
         await interaction.response.send_message(
-            "❌ Session introuvable.", ephemeral=True
+            "❌ Session not found.", ephemeral=True
         )
         return
     if interaction.user.id != session["facilitator_id"]:
         await interaction.response.send_message(
-            "❌ Seul le facilitateur peut annuler.", ephemeral=True
+            "❌ Only the facilitator can abort.", ephemeral=True
         )
         return
     with db() as conn:
@@ -621,23 +622,23 @@ async def delphi_abort(interaction: discord.Interaction, session_id: int):
             (session_id,),
         )
     await interaction.response.send_message(
-        f"🛑 Session #{session_id} annulée.", ephemeral=False
+        f"🛑 Session #{session_id} aborted.", ephemeral=False
     )
 
 
-# ============== ÉVÉNEMENTS ==============
+# ============== EVENTS ==============
 
 @bot.event
 async def on_ready():
     init_db()
     await bot.tree.sync()
-    logger.info(f"Connecté comme {bot.user} (ID: {bot.user.id})")
-    logger.info(f"Présent sur {len(bot.guilds)} serveur(s)")
+    logger.info(f"Logged in as {bot.user} (ID: {bot.user.id})")
+    logger.info(f"Present on {len(bot.guilds)} server(s)")
 
 
 if __name__ == "__main__":
     if not TOKEN:
         raise SystemExit(
-            "❌ Définissez la variable d'environnement DISCORD_BOT_TOKEN"
+            "❌ Please set the DISCORD_BOT_TOKEN environment variable"
         )
     bot.run(TOKEN, log_handler=None)

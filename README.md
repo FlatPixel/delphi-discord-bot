@@ -1,241 +1,241 @@
-# Bot Discord Delphi
+# Discord Delphi Bot
 
-Bot Discord qui implémente la **méthode Delphi** : consultation itérative et anonyme d'un panel d'experts, avec synthèse statistique entre les tours.
+Discord bot implementing the **Delphi method**: iterative, anonymous consultation of an expert panel, with statistical synthesis between rounds.
 
-## Sommaire
+## Table of contents
 
-- [Fonctionnement](#fonctionnement)
-- [1. Création du bot Discord](#1-création-du-bot-discord)
-- [2. Mise en place du repo GitHub](#2-mise-en-place-du-repo-github)
-- [3. Déploiement sur QNAP](#3-déploiement-sur-qnap)
-- [4. Mises à jour ultérieures](#4-mises-à-jour-ultérieures)
-- [Commandes du bot](#commandes-du-bot)
-- [Anonymat & sécurité](#anonymat--sécurité)
-- [Limitations connues](#limitations-connues)
+- [How it works](#how-it-works)
+- [1. Creating the Discord bot](#1-creating-the-discord-bot)
+- [2. Setting up the GitHub repo](#2-setting-up-the-github-repo)
+- [3. Deploying on QNAP](#3-deploying-on-qnap)
+- [4. Updates](#4-updates)
+- [Bot commands](#bot-commands)
+- [Anonymity & security](#anonymity--security)
+- [Known limitations](#known-limitations)
 
-## Fonctionnement
+## How it works
 
-1. Le **facilitateur** lance une session avec `/delphi_create` : question, panel (mentions), type de réponse, nombre de tours.
-2. Le bot **envoie un DM** à chaque panéliste avec un bouton « Répondre » qui ouvre un formulaire.
-3. Les réponses sont **collectées en privé** (justification optionnelle mais recommandée).
-4. Quand tous ont répondu, le bot **génère une synthèse anonymisée** : médiane, distribution, arguments — sans révéler qui a dit quoi.
-5. Le bot **DM chaque panéliste** avec cette synthèse et l'invite à réviser pour le tour suivant.
-6. Itération jusqu'à épuisement des tours, puis **rapport final** dans le canal d'origine.
+1. The **facilitator** starts a session with `/delphi_create`: question, panel (mentions), response type, number of rounds.
+2. The bot **DMs each panelist** with a "Respond" button that opens a form.
+3. Responses are **collected privately** (justification is optional but recommended).
+4. Once everyone has answered, the bot **generates an anonymized synthesis**: median, distribution, arguments — without revealing who said what.
+5. The bot **DMs each panelist** with this synthesis and invites them to revise for the next round.
+6. Iterate until all rounds are done, then **post the final report** in the original channel.
 
-Trois types de questions : **numérique** (médiane/moyenne/quartiles), **Likert 1-5** (distribution), **choix multiple** (votes par option).
-
----
-
-## 1. Création du bot Discord
-
-1. Va sur https://discord.com/developers/applications → **New Application**.
-2. Onglet **Bot** → **Add Bot** → copie le **TOKEN** (à mettre dans `.env` plus tard, **jamais dans Git**).
-3. Toujours dans **Bot** → active **Privileged Gateway Intents** → coche `SERVER MEMBERS INTENT`.
-4. Onglet **OAuth2 → URL Generator** :
-   - Scopes : `bot` + `applications.commands`
-   - Permissions : `Send Messages`, `Use Slash Commands`, `Read Message History`
-   - Copie l'URL générée, ouvre-la dans un navigateur, ajoute le bot à ton serveur.
+Three question types: **numeric** (median / mean / quartiles), **Likert 1-5** (distribution), **multiple choice** (votes per option).
 
 ---
 
-## 2. Mise en place du repo GitHub
+## 1. Creating the Discord bot
 
-### Sur ta machine de dev
+1. Go to https://discord.com/developers/applications → **New Application**.
+2. **Bot** tab → **Add Bot** → copy the **TOKEN** (put it in `.env` later, **never in Git**).
+3. Still in **Bot** → enable **Privileged Gateway Intents** → check `SERVER MEMBERS INTENT`.
+4. **OAuth2 → URL Generator** tab:
+   - Scopes: `bot` + `applications.commands`
+   - Permissions: `Send Messages`, `Use Slash Commands`, `Read Message History`
+   - Copy the generated URL, open it in a browser, add the bot to your server.
+
+---
+
+## 2. Setting up the GitHub repo
+
+### On your dev machine
 
 ```bash
-# Dans le dossier contenant tous les fichiers fournis
+# From the folder containing all the provided files
 git init
 git add .
-git commit -m "Initial commit: bot Delphi Discord"
+git commit -m "Initial commit: Discord Delphi bot"
 
-# Crée un repo sur github.com (public ou privé peu importe — le .env est gitignored)
-git remote add origin git@github.com:TON_USER/delphi-bot.git
+# Create a repo on github.com (public or private doesn't matter — .env is gitignored)
+git remote add origin git@github.com:YOUR_USER/delphi-bot.git
 git branch -M main
 git push -u origin main
 ```
 
-⚠️ **Vérifie avant le push** que `.gitignore` exclut bien `.env` et `data/`. Le repo ne doit JAMAIS contenir ton token Discord. Le fichier `.env.example` est commit, lui, comme modèle vide.
+⚠️ **Before pushing**, verify that `.gitignore` excludes `.env` and `data/`. The repo must NEVER contain your Discord token. The `.env.example` file is committed as a blank template.
 
-### Public ou privé ?
+### Public or private?
 
-- **Repo public** : pas d'auth nécessaire pour le `git clone` sur le QNAP. Simple. Tant que `.env` est gitignored, aucune info sensible n'est exposée — le code n'a rien de confidentiel.
-- **Repo privé** : il te faudra une **clé SSH** sur le NAS ajoutée à ton compte GitHub, ou un **Personal Access Token** pour cloner en HTTPS. Plus de friction mais plus discret.
+- **Public repo**: no auth needed for `git clone` on the QNAP. Simple. As long as `.env` stays gitignored, nothing sensitive is exposed — the code itself isn't confidential.
+- **Private repo**: requires an **SSH key** on the NAS added to your GitHub account, or a **Personal Access Token** for HTTPS cloning. More friction, more privacy.
 
 ---
 
-## 3. Déploiement sur QNAP
+## 3. Deploying on QNAP
 
-### Prérequis
+### Prerequisites
 
-- Modèle QNAP compatible **Container Station** (la quasi-totalité des x86 : TS-x53, x64, x73, h-series, TVS, etc.). Les modèles ARM bas de gamme (TS-x28/x31/x32) ne le supportent pas.
-- **SSH activé** sur ton NAS (Panneau de configuration → Telnet/SSH).
-- **Container Station** installé via l'App Center.
+- QNAP model compatible with **Container Station** (almost all x86 models: TS-x53, x64, x73, h-series, TVS, etc.). Low-end ARM models (TS-x28 / x31 / x32) don't support it.
+- **SSH enabled** on your NAS (Control Panel → Telnet/SSH).
+- **Container Station** installed via the App Center.
 
-### Étape 1 — Activer SSH et se connecter
+### Step 1 — Enable SSH and connect
 
-Sur l'interface QTS : *Panneau de configuration → Network & File Services → Telnet/SSH* → coche **Enable SSH**.
+In QTS: *Control Panel → Network & File Services → Telnet/SSH* → check **Enable SSH**.
 
-Depuis ton ordi :
+From your computer:
 ```bash
-ssh admin@IP_DE_TON_NAS
+ssh admin@YOUR_NAS_IP
 ```
 
-### Étape 2 — Cloner le repo
+### Step 2 — Clone the repo
 
-Choisis un emplacement de travail. Container Station crée un partage `/share/Container/` par défaut :
+Pick a working directory. Container Station creates a `/share/Container/` share by default:
 
 ```bash
 cd /share/Container/
-git clone https://github.com/TON_USER/delphi-bot.git
+git clone https://github.com/YOUR_USER/delphi-bot.git
 cd delphi-bot
 ```
 
-Pour un repo privé en SSH : `git clone git@github.com:TON_USER/delphi-bot.git` après avoir ajouté la clé publique du NAS à GitHub.
+For a private repo over SSH: `git clone git@github.com:YOUR_USER/delphi-bot.git` after adding the NAS's public key to GitHub.
 
-### Étape 3 — Configurer le token
+### Step 3 — Configure the token
 
 ```bash
 cp .env.example .env
-vi .env     # ou nano si installé via Entware
+vi .env     # or nano if installed via Entware
 ```
 
-Renseigne :
+Fill in:
 ```
-DISCORD_BOT_TOKEN=ton_token_collé_ici
+DISCORD_BOT_TOKEN=your_token_pasted_here
 ```
 
-Sauvegarde. Ce fichier reste local au NAS, jamais sur GitHub.
+Save. This file stays local to the NAS, never on GitHub.
 
-### Étape 4 — Lancer
+### Step 4 — Launch
 
 ```bash
 docker compose up -d --build
 ```
 
-Le `--build` construit l'image localement à partir du `Dockerfile`. `-d` lance en arrière-plan.
+`--build` builds the image locally from the `Dockerfile`. `-d` runs it in the background.
 
-### Étape 5 — Vérifier
+### Step 5 — Verify
 
 ```bash
 docker compose logs -f
 ```
 
-Tu dois voir une ligne du genre :
+You should see lines like:
 ```
-[INFO] delphi-bot: Connecté comme Delphi#1234 (ID: ...)
-[INFO] delphi-bot: Présent sur 1 serveur(s)
+[INFO] delphi-bot: Logged in as Delphi#1234 (ID: ...)
+[INFO] delphi-bot: Present on 1 server(s)
 ```
 
-`Ctrl+C` pour quitter les logs (le conteneur continue de tourner). Sur Discord, le bot apparaît en ligne. Lance `/delphi_create` pour tester.
+`Ctrl+C` to exit the logs (the container keeps running). On Discord, the bot appears online. Try `/delphi_create` to test.
 
-### Étape 6 — Visibilité dans Container Station
+### Step 6 — Container Station visibility
 
-Le conteneur apparaît automatiquement dans l'UI de Container Station (rubrique « Conteneurs »). Tu peux y voir les logs, l'usage CPU/RAM, le redémarrer en un clic. Tu peux aussi tout piloter en graphique : *Container Station → Créer → Créer une application → coller le contenu du `docker-compose.yml`*.
+The container shows up automatically in Container Station's UI (Containers section). You can view logs, CPU/RAM usage, and restart it in one click. You can also do everything graphically: *Container Station → Create → Create Application → paste the `docker-compose.yml` content*.
 
 ---
 
-## 4. Mises à jour ultérieures
+## 4. Updates
 
-### Workflow normal
+### Normal workflow
 
-Sur ta machine de dev, tu modifies le code → commit → push :
+On your dev machine, edit the code → commit → push:
 ```bash
 git add bot.py
-git commit -m "feat: ajout deadline automatique par tour"
+git commit -m "feat: add automatic per-round deadline"
 git push
 ```
 
-Sur le QNAP en SSH :
+On the QNAP via SSH:
 ```bash
 cd /share/Container/delphi-bot
 ./update.sh
 ```
 
-Le script fait `git pull` + `docker compose build` + `docker compose up -d` + affiche les logs. C'est tout.
+The script runs `git pull` + `docker compose build` + `docker compose up -d` + tails the logs. That's it.
 
-### Si update.sh n'est pas exécutable
+### If update.sh isn't executable
 
 ```bash
 chmod +x update.sh
 ```
 
-### Rollback en cas de pépin
+### Rollback if something breaks
 
 ```bash
-git log --oneline                    # trouve un commit qui marchait
+git log --oneline                    # find a working commit
 git checkout COMMIT_HASH
 docker compose up -d --build
 ```
 
 ---
 
-## Commandes du bot
+## Bot commands
 
-| Commande | Usage |
-|----------|-------|
-| `/delphi_create` | Lance une session (facilitateur) |
-| `/delphi_respond session_id:N` | Répondre au tour en cours (fallback si le bouton DM ne marche plus, ex. après redémarrage du bot) |
-| `/delphi_status session_id:N` | État d'une session |
-| `/delphi_close_round session_id:N` | Force la clôture du tour (facilitateur) |
-| `/delphi_abort session_id:N` | Annule la session (facilitateur) |
+| Command | Usage |
+|---------|-------|
+| `/delphi_create` | Start a session (facilitator) |
+| `/delphi_respond session_id:N` | Respond to the current round (fallback if the DM button stops working, e.g. after a bot restart) |
+| `/delphi_status session_id:N` | Show session state |
+| `/delphi_close_round session_id:N` | Force-close the current round (facilitator) |
+| `/delphi_abort session_id:N` | Abort the session (facilitator) |
 
-### Exemples
+### Examples
 
 ```
 /delphi_create
-  question: Combien de jours-homme pour livrer la refonte du back-office ?
+  question: How many person-days to deliver the back-office redesign?
   panel: @alice @bob @charlie @diana
-  type: Numérique (estimation chiffrée)
+  type: Numeric (numerical estimate)
   rounds: 3
 ```
 
 ```
 /delphi_create
-  question: Quel marché prioriser au S2 ?
+  question: Which market should we prioritize in H2?
   panel: @alice @bob @charlie
-  type: Choix parmi options
+  type: Choice among options
   rounds: 2
-  options: France|Allemagne|Espagne|Italie
+  options: France|Germany|Spain|Italy
 ```
 
 ---
 
-## Anonymat & sécurité
+## Anonymity & security
 
-- **Côté panel** : personne ne voit qui a répondu quoi. Les synthèses ne contiennent qu'agrégats statistiques et justifications dépersonnalisées.
-- **Côté serveur** : la base SQLite (`data/delphi.db` sur le NAS) contient le `user_id` de chaque réponse. C'est nécessaire pour empêcher le double-vote et suivre qui n'a pas encore répondu. Quiconque a un accès SSH/admin au NAS peut donc techniquement remonter aux votes individuels.
-- **Réseau** : aucun port n'est exposé. Le bot fait uniquement des connexions sortantes vers les serveurs Discord. Le NAS reste invisible depuis Internet pour ce service.
-- **Backup** : la base est dans `./data/`, à inclure dans ta stratégie de sauvegarde habituelle (Hyper Data Protector, snapshots, etc.).
-
----
-
-## Limitations connues
-
-- **Pas de vues persistantes** : si le bot redémarre, le bouton « Répondre » des DMs en cours cesse de marcher. Fallback : `/delphi_respond`.
-- **Pas de timeout automatique par tour** : si un panéliste ne répond jamais, clôturer manuellement avec `/delphi_close_round`.
-- **Pas de questions texte libre** : pour ajouter ce mode, brancher un LLM (API Anthropic par exemple) sur les justifications pour les résumer.
-- **Pas d'export CSV/JSON** des sessions.
-- **Une session = une question** : pour un questionnaire à plusieurs items, lancer plusieurs sessions en parallèle.
+- **Panel-side**: nobody sees who answered what. Syntheses contain only statistical aggregates and depersonalized justifications.
+- **Server-side**: the SQLite database (`data/delphi.db` on the NAS) stores the `user_id` for each response. This is necessary to prevent double-voting and to track who hasn't responded yet. Anyone with SSH/admin access to the NAS can therefore technically trace individual votes.
+- **Network**: no ports are exposed. The bot only makes outbound connections to Discord servers. The NAS stays invisible from the internet for this service.
+- **Backup**: the database lives in `./data/`. Include it in your regular QNAP backup strategy (Hyper Data Protector, snapshots, etc.).
 
 ---
 
-## Structure du repo
+## Known limitations
+
+- **No persistent views**: if the bot restarts, the "Respond" button on in-flight DMs stops working. Fallback: `/delphi_respond`.
+- **No automatic per-round timeout**: if a panelist never responds, close manually with `/delphi_close_round`.
+- **No free-text questions**: to add this, plug an LLM (e.g. Anthropic API) into the justifications to summarize them.
+- **No CSV/JSON export** of sessions.
+- **One session = one question**: for a multi-item questionnaire, run several sessions in parallel.
+
+---
+
+## Repo structure
 
 ```
 delphi-bot/
-├── bot.py                  # Code du bot
-├── requirements.txt        # Dépendances Python
-├── Dockerfile              # Build de l'image
+├── bot.py                  # Bot code
+├── requirements.txt        # Python dependencies
+├── Dockerfile              # Image build
 ├── docker-compose.yml      # Orchestration
-├── .env.example            # Modèle de config (à copier en .env)
-├── .gitignore              # Exclut .env, data/, __pycache__
-├── update.sh               # Script de mise à jour côté QNAP
-└── README.md               # Ce fichier
+├── .env.example            # Config template (copy to .env)
+├── .gitignore              # Excludes .env, data/, __pycache__
+├── update.sh               # Update script for the QNAP
+└── README.md               # This file
 ```
 
-Sur le NAS après déploiement, s'ajoutent :
+After deployment on the NAS, this is added:
 ```
-├── .env                    # Token Discord (jamais commit)
+├── .env                    # Discord token (never committed)
 └── data/
-    └── delphi.db           # Base SQLite (jamais commit)
+    └── delphi.db           # SQLite database (never committed)
 ```

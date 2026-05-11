@@ -7,10 +7,10 @@ services:
     env_file:
       - .env
     volumes:
-      # Base SQLite persistante sur le NAS
+      # Persistent SQLite database on the NAS
       - ./data:/data
-    # Aucun port exposé : le bot fait uniquement des connexions sortantes
-    # vers Discord. Le NAS reste invisible depuis Internet.
+    # No ports exposed: the bot only makes outbound connections to Discord.
+    # The NAS stays invisible from the internet for this service.
     logging:
       driver: json-file
       options:

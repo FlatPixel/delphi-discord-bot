@@ -1,9 +1,9 @@
-# Secrets — NE JAMAIS COMMITER
+# Secrets — NEVER COMMIT
 .env
 *.env
 !.env.example
 
-# Données utilisateur
+# User data
 data/
 *.db
 *.db-journal
